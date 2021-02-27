@@ -1,5 +1,5 @@
 theory Projective_Geometry
-imports "HOL-Analysis.Cross3"
+imports "HOL-Analysis.Cross3" "Instantiate_Existentials"
 begin                           
 
 text "Some basic setup to pretty print calculation results."
@@ -61,12 +61,17 @@ proof (safe, standard, goal_cases)
     by (simp add: cross_mult_left cross_mult_right)
 qed
 
-definition "meet = join"
+definition [simp]: "meet \<equiv> join"
+
+lemma incid_join:
+  "incid p (join p q)"
+  "incid q (join p q)"
+  by (transfer; simp add: dot_cross_self)+
 
 lemma incid_meet:
-  "incid p (join p q)"
-  "incid p (join q p)"
-  by (transfer; simp add: dot_cross_self)+
+  "incid (join p q) p"
+  "incid (join p q) q"
+  by (metis incid.rep_eq incid_join inner_commute)+
 
 term det
 
@@ -170,4 +175,74 @@ proof (goal_cases)
   then show ?case
     by (metis (no_types, lifting) 1 cross_matrix_mult cross_zero_right dot_cross_det norm_and_cross_eq_0 scale_eq_0_iff vec.zero)
 qed
+
+ (* Taken from existing Projective_Geometry Submission in  the AFP *)
+
+
+locale projective_plane =
+  fixes incid :: "'a \<Rightarrow> 'b::zero \<Rightarrow> bool"
+  assumes A1: "\<exists>l. incid P l \<and> incid Q l"
+  assumes A2: "\<exists>P. incid P l \<and> incid P m"
+  assumes A3: "\<lbrakk>incid P l; incid Q l; incid P m; incid Q m\<rbrakk> \<Longrightarrow>  P = Q \<or> l = m"
+  assumes A4: "\<exists>A B C D. (A \<noteq> B) \<and> (A \<noteq> C) \<and> (A \<noteq> D) \<and> (B \<noteq> C) \<and> (B \<noteq> D) \<and> (C \<noteq> D) \<and> (\<forall>l \<noteq> 0. 
+              (incid A l \<and> incid B l \<longrightarrow> \<not>(incid C l) \<and> \<not>(incid D l)) \<and>
+              (incid A l \<and> incid C l \<longrightarrow> \<not>(incid B l) \<and> \<not>(incid D l)) \<and>
+              (incid A l \<and> incid D l \<longrightarrow> \<not>(incid B l) \<and> \<not>(incid C l)) \<and>
+              (incid B l \<and> incid C l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid D l)) \<and>
+              (incid B l \<and> incid D l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid C l)) \<and>
+              (incid C l \<and> incid D l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid B l)))"
+begin
+end
+
+interpretation projective_real_plane: projective_plane incid
+proof(standard, goal_cases)
+  case (1 P Q)
+  have "incid P (join P Q)" "incid Q (join P Q)"
+    by (simp_all add: incid_join)
+  then show ?case by blast
+next
+  case (2 l m)
+  have "incid (meet l m) l" "incid (meet l m) m"
+    by (simp_all add: incid_meet)
+  then show ?case by blast
+next
+  case (3 P l Q m)
+  then show ?case
+    apply transfer
+    apply(simp add: scalar_multiple_def)
+  proof(goal_cases)
+    case (1 P l Q m)
+    then show ?case sorry
+  qed
+next
+  case 4
+  then show ?case
+    apply(transfer)
+    apply (inst_existentials
+        "vector [1,0,0] :: (real, 3) vec"
+        "vector [0,1,0] :: (real, 3) vec"
+        "vector [0,0,1] :: (real, 3) vec"
+        "vector [1,1,1] :: (real, 3) vec")
+          apply (auto simp add: scalar_multiple_def)
+                     apply (smt (z3) vector_3 vector_scaleR_component)
+                    apply (smt (z3) vector_3 vector_scaleR_component)
+                   apply (smt (z3) vector_3 vector_scaleR_component)
+                  apply (smt (z3) vector_3 vector_scaleR_component)
+                 apply (smt (z3) vector_3 vector_scaleR_component)
+                apply (smt (z3) vector_3 vector_scaleR_component)
+               apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+              apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+             apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+            apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+           apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+          apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+         apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+        apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+       apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+      apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+     apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+    apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
+    done
+qed
+
 end
