@@ -32,8 +32,13 @@ value "of_vector3 (cross3 example example2)"
 
 text "The quotient type"
 
-definition scalar_multiple:: "(real,3) vec \<Rightarrow> (real,3) vec \<Rightarrow> bool" where
+
+definition scalar_multiple:: "(real,'b::finite) vec \<Rightarrow> (real,'b::finite) vec \<Rightarrow> bool" where
   "scalar_multiple u v \<equiv> \<exists>c::real. c \<noteq> 0 \<and> u = c *\<^sub>R v"
+
+definition parallel:: "(real,'b::finite) vec \<Rightarrow> (real,'b) vec \<Rightarrow> bool" where
+  "parallel \<equiv> scalar_multiple"
+
 
 quotient_type homog = "(real,3) vec" / scalar_multiple
   apply(rule equivpI)
@@ -180,10 +185,10 @@ qed
 
 
 locale projective_plane =
-  fixes incid :: "'a \<Rightarrow> 'b::zero \<Rightarrow> bool"
+  fixes incid :: "'a::zero \<Rightarrow> 'b::zero \<Rightarrow> bool"
   assumes A1: "\<exists>l. incid P l \<and> incid Q l"
   assumes A2: "\<exists>P. incid P l \<and> incid P m"
-  assumes A3: "\<lbrakk>incid P l; incid Q l; incid P m; incid Q m\<rbrakk> \<Longrightarrow>  P = Q \<or> l = m"
+  assumes A3: "\<lbrakk>P \<noteq> 0; l \<noteq> 0; Q \<noteq> 0; m \<noteq> 0; incid P l; incid Q l; incid P m; incid Q m\<rbrakk> \<Longrightarrow>  P = Q \<or> l = m"
   assumes A4: "\<exists>A B C D. (A \<noteq> B) \<and> (A \<noteq> C) \<and> (A \<noteq> D) \<and> (B \<noteq> C) \<and> (B \<noteq> D) \<and> (C \<noteq> D) \<and> (\<forall>l \<noteq> 0. 
               (incid A l \<and> incid B l \<longrightarrow> \<not>(incid C l) \<and> \<not>(incid D l)) \<and>
               (incid A l \<and> incid C l \<longrightarrow> \<not>(incid B l) \<and> \<not>(incid D l)) \<and>
@@ -193,6 +198,35 @@ locale projective_plane =
               (incid C l \<and> incid D l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid B l)))"
 begin
 end
+
+lemma cross3_scalar_multiple: "cross3 x y = 0 \<longleftrightarrow> (scalar_multiple x y \<or> x = 0 \<or> y = 0)"
+  unfolding scalar_multiple_def
+  unfolding cross_eq_0 collinear_lemma
+  by (metis homog.abs_eq_iff scalar_multiple_def scale_zero_left)
+
+lemma cross3_scalar_non0: "\<lbrakk>x \<noteq> 0; y \<noteq> 0\<rbrakk> \<Longrightarrow> cross3 x y = 0 \<longleftrightarrow> scalar_multiple x y"
+  by (simp add: cross3_scalar_multiple)
+
+find_theorems cross3 norm
+find_theorems norm inner
+find_theorems "_ = norm ?x * norm ?y"
+find_theorems "norm _ *\<^sub>R _ = _"
+find_theorems norm
+
+lemma scalar_multiple_coll: "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (collinear {0, a, b})"
+  by (metis (no_types, lifting) collinear_lemma insert_commute scalar_multiple_def scale_eq_0_iff)
+
+lemma "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (norm b *\<^sub>R a = norm a *\<^sub>R b)"
+  unfolding scalar_multiple_coll
+  unfolding sym[OF norm_cauchy_schwarz_eq] sym[OF norm_cauchy_schwarz_equal]
+  apply auto
+  oops
+
+lemma "\<lbrakk>orthogonal a x; orthogonal a y\<rbrakk> \<Longrightarrow> scalar_multiple a (cross3 x y)"
+  apply(auto simp add: orthogonal_def cross3_def scalar_multiple_def vec_eq_iff)
+  nitpick
+proof
+  find_theorems cross3 orthogonal
 
 interpretation projective_real_plane: projective_plane incid
 proof(standard, goal_cases)
@@ -208,11 +242,12 @@ next
 next
   case (3 P l Q m)
   then show ?case
-    apply transfer
-    apply(simp add: scalar_multiple_def)
-  proof(goal_cases)
-    case (1 P l Q m)
-    then show ?case sorry
+    apply (transfer)
+    apply(auto simp add: scalar_multiple_def)
+    find_theorems inner 0
+    find_theorems orthogonal
+    find_theorems collinear
+    
   qed
 next
   case 4
