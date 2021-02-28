@@ -89,6 +89,9 @@ definition nzincid :: "nzhomog \<Rightarrow> nzhomog \<Rightarrow> bool" where "
 lemma nzincid_rule: "a \<noteq> 0 \<Longrightarrow> b \<noteq> 0 \<Longrightarrow> incid a b \<Longrightarrow> nzincid a b"
   using nzincid_def by presburger
 
+lemma nzincid_simp: "nzincid a b \<longleftrightarrow> a \<noteq> 0 \<and> b \<noteq> 0 \<and> incid a b"
+  by (metis homog_of_nzhomog mem_Collect_eq non_zero_def nzincid_def)
+
 lift_definition join :: "homog \<Rightarrow> homog \<Rightarrow> homog" is "\<lambda>u v.
    cross3 u v"
   unfolding scalar_multiple_def

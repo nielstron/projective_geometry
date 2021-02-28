@@ -42,7 +42,7 @@ lemma ex_cross3_non_zero:
 proof (cases "scalar_multiple P (axis 1 1)")
   case True
   then have "\<not> scalar_multiple P (axis 2 1)"
-    by (smt (verit) Projective_Geometry.cross3_scalar_non0 axis_eq_0_iff cross_basis(2) homog.abs_eq_iff neg_equal_0_iff_equal)
+    by (smt (verit) cross3_scalar_non0 axis_eq_0_iff cross_basis(2) homog.abs_eq_iff neg_equal_0_iff_equal)
   then have "cross3 P (axis 2 1) \<noteq> 0"
     by (simp add: cross3_scalar_multiple assms)
   then show ?thesis
@@ -104,7 +104,8 @@ next
   case (3 P l Q m)
   then show ?case
     apply (transfer)
-    apply(auto simp add: scalar_multiple_def)
+    apply(auto simp add: scalar_multiple_def nzincid_simp)
+    sorry (* TODO ! *)
     find_theorems inner 0
     find_theorems orthogonal
     find_theorems collinear
