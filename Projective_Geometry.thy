@@ -39,34 +39,75 @@ definition scalar_multiple:: "(real,'b::finite) vec \<Rightarrow> (real,'b::fini
 definition parallel:: "(real,'b::finite) vec \<Rightarrow> (real,'b) vec \<Rightarrow> bool" where
   "parallel \<equiv> scalar_multiple"
 
+definition "non_zero = {x. x \<noteq> 0}"
+
+(*
+typedef (overloaded) ('a::zero_neq_one, 'b::finite) nzvec = "non_zero :: (('a, 'b) vec) set"
+  morphisms vec_of nzvec_of
+proof
+  show "(\<chi> i::'b. (1::'a)) \<in> non_zero"
+    by (metis mem_Collect_eq non_zero_def one_index one_vec_def zero_index zero_neq_one)
+qed
+
+declare [[coercion vec_of]] *)
 
 quotient_type homog = "(real,3) vec" / scalar_multiple
+  morphisms vec_of_homog homog_of_vec
   apply(rule equivpI)
     apply (auto simp add: reflp_def symp_def transp_def scalar_multiple_def)
    apply (metis divide_inverse_commute divide_self_if inverse_eq_divide scaleR_one zero_eq_1_divide_iff)
   by (metis mult_eq_0_iff)
 
-instantiation homog :: zero begin
+declare [[coercion vec_of_homog]]
 
-lift_definition zero_homog :: homog is 0 .
+instantiation homog :: zero
+begin
+
+lift_definition zero_homog :: homog is "(0 :: (real,3) vec)" .
 
 instance ..
-
 end
+
+lift_definition one_homog :: homog is "(\<chi> i. 1)" .
+
+typedef nzhomog = "non_zero :: homog set"
+  morphisms homog_of_nzhomog nzhomog_of_homog
+proof
+  show "one_homog \<in> non_zero"
+    by (smt (verit, del_insts) Quotient3_homog Quotient3_rel mem_Collect_eq non_zero_def one_homog_def one_vec_def scalar_multiple_def scale_eq_0_iff zero_homog_def zero_neq_one)
+qed
+
+declare [[coercion homog_of_nzhomog]]
+
 
 lift_definition incid :: "homog \<Rightarrow> homog \<Rightarrow> bool" is "\<lambda>u v. inner u v = 0"
   unfolding scalar_multiple_def
   by auto
 
-lift_definition join :: "homog \<Rightarrow> homog \<Rightarrow> homog" is cross3
+definition nzincid :: "nzhomog \<Rightarrow> nzhomog \<Rightarrow> bool" where "nzincid = incid"
+
+lemma nzincid_rule: "a \<noteq> 0 \<Longrightarrow> b \<noteq> 0 \<Longrightarrow> incid a b \<Longrightarrow> nzincid a b"
+  using nzincid_def by presburger
+
+lift_definition join :: "homog \<Rightarrow> homog \<Rightarrow> homog" is "\<lambda>u v.
+   cross3 u v"
   unfolding scalar_multiple_def
-proof (safe, standard, goal_cases)
-  case (1 vec1 vec2 vec3 vec4 a b)
-  then show "a * b \<noteq> 0 \<and>cross3 (a *\<^sub>R vec2) (b *\<^sub>R vec4) = (a*b) *\<^sub>R cross3 vec2 vec4"
-    by (simp add: cross_mult_left cross_mult_right)
+proof (safe, goal_cases)
+  case (1 v1 v2 v3 v4 a b)
+  then show ?case
+    apply(inst_existentials "a*b")
+    by (auto simp add: cross_mult_left cross_mult_right)
 qed
 
+definition nzjoin :: "nzhomog \<Rightarrow> nzhomog \<Rightarrow> nzhomog" where
+  "u \<noteq> v \<Longrightarrow> nzjoin u v = nzhomog_of_homog (join u v)"
+
+lemma nzjoin_rule: "a \<noteq> 0 \<Longrightarrow> b \<noteq> 0 \<Longrightarrow> a \<noteq> b \<Longrightarrow> join a b = p \<Longrightarrow> nzjoin a b = p"
+  using homog_of_nzhomog_inverse nzjoin_def by presburger
+
 definition [simp]: "meet \<equiv> join"
+
+definition [simp]: "nzmeet \<equiv> nzjoin"
 
 lemma incid_join:
   "incid p (join p q)"
@@ -78,7 +119,41 @@ lemma incid_meet:
   "incid (join p q) q"
   by (metis incid.rep_eq incid_join inner_commute)+
 
-term det
+lemma cross3_scalar_multiple: "cross3 x y = 0 \<longleftrightarrow> (scalar_multiple x y \<or> x = 0 \<or> y = 0)"
+  unfolding scalar_multiple_def
+  unfolding cross_eq_0 collinear_lemma
+  by (metis homog.abs_eq_iff scalar_multiple_def scale_zero_left)
+
+lemma cross3_scalar_non0: "\<lbrakk>x \<noteq> 0; y \<noteq> 0\<rbrakk> \<Longrightarrow> cross3 x y = 0 \<longleftrightarrow> scalar_multiple x y"
+  by (simp add: cross3_scalar_multiple)
+
+
+lemma scalar_multiple_coll: "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (collinear {0, a, b})"
+  by (metis (no_types, lifting) collinear_lemma insert_commute scalar_multiple_def scale_eq_0_iff)
+
+lemma homog_nzhomog_eq: "p \<noteq> 0 \<Longrightarrow> homog_of_nzhomog (nzhomog_of_homog p) = p"
+  by (simp add: non_zero_def nzhomog_of_homog_inverse)
+
+lemma nzincid_join:
+  assumes "p \<noteq> q"
+  shows "nzincid p (nzjoin p q)"
+  and "nzincid q (nzjoin p q)"
+  and "nzincid (nzjoin p q) p"
+  and "nzincid (nzjoin p q) q"
+proof -
+  from assms have "cross3 p q \<noteq> 0"
+    by (metis (full_types) Quotient3_abs_rep Quotient3_homog Quotient3_rel_rep cross3_scalar_multiple homog_of_nzhomog homog_of_nzhomog_inject mem_Collect_eq non_zero_def zero_homog.abs_eq)
+  then have "join p q \<noteq> 0"
+    by (smt (verit, del_insts) Quotient3_abs_rep Quotient3_homog incid.abs_eq incid.transfer inner_eq_zero_iff join.abs_eq rel_fun_def zero_homog.transfer)
+  moreover have "nzjoin p q = nzhomog_of_homog (join p q)"
+    by (simp add: \<open>p \<noteq> q\<close> homog_of_nzhomog_inverse nzjoin_def)
+  ultimately show
+    "nzincid p (nzjoin p q)"
+    "nzincid q (nzjoin p q)"
+    "nzincid (nzjoin p q) p"
+    "nzincid (nzjoin p q) q"
+    by (simp_all add: homog_of_nzhomog_inverse nzincid_def homog_nzhomog_eq incid_join incid_meet)
+qed
 
 definition mat_of_vec3 :: "(real,3) vec \<Rightarrow> (real,3) vec \<Rightarrow> (real,3) vec \<Rightarrow> ((real,3) vec, 3) vec" where
   "mat_of_vec3 a b c = vector [a,b,c]"
@@ -180,104 +255,8 @@ proof (goal_cases)
   then show ?case
     by (metis (no_types, lifting) 1 cross_matrix_mult cross_zero_right dot_cross_det norm_and_cross_eq_0 scale_eq_0_iff vec.zero)
 qed
+(* TODO other direction *)
 
- (* Taken from existing Projective_Geometry Submission in  the AFP *)
 
-
-locale projective_plane =
-  fixes incid :: "'a::zero \<Rightarrow> 'b::zero \<Rightarrow> bool"
-  assumes A1: "\<exists>l. incid P l \<and> incid Q l"
-  assumes A2: "\<exists>P. incid P l \<and> incid P m"
-  assumes A3: "\<lbrakk>P \<noteq> 0; l \<noteq> 0; Q \<noteq> 0; m \<noteq> 0; incid P l; incid Q l; incid P m; incid Q m\<rbrakk> \<Longrightarrow>  P = Q \<or> l = m"
-  assumes A4: "\<exists>A B C D. (A \<noteq> B) \<and> (A \<noteq> C) \<and> (A \<noteq> D) \<and> (B \<noteq> C) \<and> (B \<noteq> D) \<and> (C \<noteq> D) \<and> (\<forall>l \<noteq> 0. 
-              (incid A l \<and> incid B l \<longrightarrow> \<not>(incid C l) \<and> \<not>(incid D l)) \<and>
-              (incid A l \<and> incid C l \<longrightarrow> \<not>(incid B l) \<and> \<not>(incid D l)) \<and>
-              (incid A l \<and> incid D l \<longrightarrow> \<not>(incid B l) \<and> \<not>(incid C l)) \<and>
-              (incid B l \<and> incid C l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid D l)) \<and>
-              (incid B l \<and> incid D l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid C l)) \<and>
-              (incid C l \<and> incid D l \<longrightarrow> \<not>(incid A l) \<and> \<not>(incid B l)))"
-begin
-end
-
-lemma cross3_scalar_multiple: "cross3 x y = 0 \<longleftrightarrow> (scalar_multiple x y \<or> x = 0 \<or> y = 0)"
-  unfolding scalar_multiple_def
-  unfolding cross_eq_0 collinear_lemma
-  by (metis homog.abs_eq_iff scalar_multiple_def scale_zero_left)
-
-lemma cross3_scalar_non0: "\<lbrakk>x \<noteq> 0; y \<noteq> 0\<rbrakk> \<Longrightarrow> cross3 x y = 0 \<longleftrightarrow> scalar_multiple x y"
-  by (simp add: cross3_scalar_multiple)
-
-find_theorems cross3 norm
-find_theorems norm inner
-find_theorems "_ = norm ?x * norm ?y"
-find_theorems "norm _ *\<^sub>R _ = _"
-find_theorems norm
-
-lemma scalar_multiple_coll: "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (collinear {0, a, b})"
-  by (metis (no_types, lifting) collinear_lemma insert_commute scalar_multiple_def scale_eq_0_iff)
-
-lemma "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (norm b *\<^sub>R a = norm a *\<^sub>R b)"
-  unfolding scalar_multiple_coll
-  unfolding sym[OF norm_cauchy_schwarz_eq] sym[OF norm_cauchy_schwarz_equal]
-  apply auto
-  oops
-
-lemma "\<lbrakk>orthogonal a x; orthogonal a y\<rbrakk> \<Longrightarrow> scalar_multiple a (cross3 x y)"
-  apply(auto simp add: orthogonal_def cross3_def scalar_multiple_def vec_eq_iff)
-  nitpick
-proof
-  find_theorems cross3 orthogonal
-
-interpretation projective_real_plane: projective_plane incid
-proof(standard, goal_cases)
-  case (1 P Q)
-  have "incid P (join P Q)" "incid Q (join P Q)"
-    by (simp_all add: incid_join)
-  then show ?case by blast
-next
-  case (2 l m)
-  have "incid (meet l m) l" "incid (meet l m) m"
-    by (simp_all add: incid_meet)
-  then show ?case by blast
-next
-  case (3 P l Q m)
-  then show ?case
-    apply (transfer)
-    apply(auto simp add: scalar_multiple_def)
-    find_theorems inner 0
-    find_theorems orthogonal
-    find_theorems collinear
-    
-  qed
-next
-  case 4
-  then show ?case
-    apply(transfer)
-    apply (inst_existentials
-        "vector [1,0,0] :: (real, 3) vec"
-        "vector [0,1,0] :: (real, 3) vec"
-        "vector [0,0,1] :: (real, 3) vec"
-        "vector [1,1,1] :: (real, 3) vec")
-          apply (auto simp add: scalar_multiple_def)
-                     apply (smt (z3) vector_3 vector_scaleR_component)
-                    apply (smt (z3) vector_3 vector_scaleR_component)
-                   apply (smt (z3) vector_3 vector_scaleR_component)
-                  apply (smt (z3) vector_3 vector_scaleR_component)
-                 apply (smt (z3) vector_3 vector_scaleR_component)
-                apply (smt (z3) vector_3 vector_scaleR_component)
-               apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-              apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-             apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-            apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-           apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-          apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-         apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-        apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-       apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-      apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-     apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-    apply (smt (z3) cross3_def cross_zero_right inner_real_def inner_vec_def mult_eq_0_iff norm_and_cross_eq_0 sum_3 vector_3(1) vector_3(2) vector_3(3))
-    done
-qed
 
 end
