@@ -116,6 +116,12 @@ lift_definition incidz :: "homogz \<Rightarrow> homogz \<Rightarrow> bool" is "\
 
 definition incid :: "homog \<Rightarrow> homog \<Rightarrow> bool" where "incid = incidz"
 
+lemma incidz_commute: "incidz p l = incidz l p"
+  by (simp add: incidz.rep_eq inner_commute)+
+
+lemma incid_commute: "incid p l = incid l p"
+  by (simp add: incid_def incidz_commute)+
+
 lift_definition joinz :: "homogz \<Rightarrow> homogz \<Rightarrow> homogz" is "\<lambda>u v.
    cross3 u v"
   unfolding scalar_multiple_def
@@ -130,19 +136,39 @@ definition join :: "homog \<Rightarrow> homog \<Rightarrow> homog" where
   "u \<noteq> v \<Longrightarrow> join u v = homog_of_homogz (joinz u v)"
 
 
-definition [simp]: "meet \<equiv> joinz"
+definition [simp]: "meetz \<equiv> joinz"
 
-definition [simp]: "nzmeet \<equiv> join"
+definition [simp]: "meet \<equiv> join"
+
+lemma joinz_commute: "joinz p q = joinz q p"
+  apply(transfer)
+proof -
+  fix p q
+  have "cross3 p q = - cross3 q p"
+    using cross_skew by blast
+  moreover have "(-1::real) \<noteq> 0"
+    by simp
+  ultimately show "scalar_multiple (cross3 p q) (cross3 q p)"
+    unfolding scalar_multiple_def
+    by (metis scaleR_minus1_left)
+qed
+
+lemma join_commute: "join p q = join q p"
+  by (metis join_def joinz_commute)
 
 lemma incidz_joinz:
   "incidz p (joinz p q)"
   "incidz q (joinz p q)"
   by (transfer; simp add: dot_cross_self)+
 
-lemma incidz_meet:
+lemma incidz_meetz:
   "incidz (joinz p q) p"
   "incidz (joinz p q) q"
-  by (metis incidz.rep_eq incidz_joinz inner_commute)+
+  by (simp_all add: incidz_commute incidz_joinz)
+
+lemma homogz_homog_eq: "p \<noteq> 0 \<Longrightarrow> homogz_of_homog (homog_of_homogz p) = p"
+  by (simp add: non_zero_def homog_of_homogz_inverse)
+
 
 lemma cross3_scalar_multiple: "cross3 x y = 0 \<longleftrightarrow> (scalar_multiple x y \<or> x = 0 \<or> y = 0)"
   unfolding scalar_multiple_def
@@ -156,15 +182,11 @@ lemma cross3_scalar_non0: "\<lbrakk>x \<noteq> 0; y \<noteq> 0\<rbrakk> \<Longri
 lemma scalar_multiple_coll: "\<lbrakk>a \<noteq> 0; b \<noteq> 0\<rbrakk> \<Longrightarrow> (scalar_multiple a b) = (collinear {0, a, b})"
   by (metis (no_types, lifting) collinear_lemma insert_commute scalar_multiple_def scale_eq_0_iff)
 
-lemma homogz_homog_eq: "p \<noteq> 0 \<Longrightarrow> homogz_of_homog (homog_of_homogz p) = p"
-  by (simp add: non_zero_def homog_of_homogz_inverse)
 
 lemma incid_joinz:
   assumes "p \<noteq> q"
   shows "incid p (join p q)"
   and "incid q (join p q)"
-  and "incid (join p q) p"
-  and "incid (join p q) q"
 proof -
   from assms have "cross3 p q \<noteq> 0"
     by (metis (full_types) Quotient3_abs_rep Quotient3_homogz Quotient3_rel_rep cross3_scalar_multiple homogz_of_homog homogz_of_homog_inject mem_Collect_eq non_zero_def zero_homogz.abs_eq)
@@ -175,9 +197,7 @@ proof -
   ultimately show
     "incid p (join p q)"
     "incid q (join p q)"
-    "incid (join p q) p"
-    "incid (join p q) q"
-    by (simp_all add: homogz_of_homog_inverse incid_def homogz_homog_eq incidz_joinz incidz_meet)
+    by (simp_all add: homogz_of_homog_inverse incid_def homogz_homog_eq incidz_joinz incidz_meetz)
 qed
 
 definition mat_of_vec3 :: "(real,3) vec \<Rightarrow> (real,3) vec \<Rightarrow> (real,3) vec \<Rightarrow> ((real,3) vec, 3) vec" where
@@ -390,8 +410,216 @@ proof(goal_cases)
   then have "det (mat_of_vec3 p q r) = 0"
     by simp
   then have "dependent {p, q, r}"
-    sorry
-  then show ?case sorry
+    oops
+
+
+lemma proj2_points_define_linez:
+  shows "\<exists>l\<noteq>0. incidz p l \<and> incidz q l"
+proof -
+  let ?p' = "vec_of_homogz p"
+  let ?q' = "vec_of_homogz q"
+  let ?B = "{?p', ?q'}"
+  from card_suc_ge_insert [of ?p' "{?q'}"] have "card ?B \<le> 2" by simp
+  with dim_le_card' [of ?B] have "dim ?B < 3" by simp
+  with lowdim_subset_hyperplane [of ?B]
+  obtain l' where "l' \<noteq> 0" and "span ?B \<subseteq> {x. l' \<bullet> x = 0}" by auto
+  let ?l = "homogz_of_vec l'"
+  let ?l'' = "vec_of_homogz ?l"
+  from  \<open>l' \<noteq> 0\<close>
+  obtain k where "?l'' = k *\<^sub>R l'"
+    using homogz.abs_eq_iff homogz_mult_eq scalar_multiple_def by fastforce
+
+  have "?p' \<in> ?B" and "?q' \<in> ?B" by simp_all
+  with span_superset [of ?B] and \<open>span ?B \<subseteq> {x. l' \<bullet> x = 0}\<close>
+  have "l' \<bullet> ?p' = 0" and "l' \<bullet> ?q' = 0" by auto
+  hence "?p' \<bullet> l' = 0" and "?q' \<bullet> l' = 0" by (simp_all add: inner_commute)
+  with dot_scaleR_mult(2) [of _ k l'] and \<open>?l'' = k *\<^sub>R l'\<close>
+  have "incidz p ?l \<and> incidz q ?l"
+    unfolding incidz_def
+    by simp
+  moreover have "homogz_of_vec l' \<noteq> 0"
+    by (simp add: \<open>l' \<noteq> 0\<close> homogz.abs_eq_iff scalar_multiple_def zero_homogz_def)
+  ultimately show "\<exists> l. l \<noteq> 0 \<and> incidz p l \<and> incidz q l"
+    by blast
 qed
+
+lemma proj2_points_define_line:
+  shows "\<exists> l. incid p l \<and> incid q l"
+  unfolding incid_def
+  using proj2_points_define_linez homog_non_zero homogz_homog_eq
+  by metis
+
+definition line_through :: "homog \<Rightarrow> homog \<Rightarrow> homog" where
+  "line_through p q \<equiv> \<some> l. incid p l \<and> incid q l"
+
+lemma line_through_incident:
+  shows "incid p (line_through p q)"
+  and "incid q (line_through p q)"
+  unfolding line_through_def
+  using proj2_points_define_line
+    and someI_ex [of "\<lambda> l. incid p l \<and> incid q l"]
+  by simp_all
+
+lemma line_through_unique:
+  assumes "p \<noteq> q" and "incid p l" and "incid q l"
+  shows "l = line_through p q"
+proof -
+  let ?l' = "vec_of_homog l"
+  let ?m = "line_through p q"
+  let ?m' = "vec_of_homog ?m"
+  let ?p' = "vec_of_homog p"
+  let ?q' = "vec_of_homog q"
+  let ?A = "{?p', ?q'}"
+  let ?B = "insert ?m' ?A"
+  from line_through_incident
+  have "incid p ?m" and "incid q ?m" by simp_all
+  with \<open>incid p l\<close> and \<open>incid q l\<close>
+  have ortho: "\<And>w. w\<in>?A \<Longrightarrow> orthogonal ?m' w" "\<And>w. w\<in>?A \<Longrightarrow> orthogonal ?l' w"
+    unfolding incid_def and orthogonal_def
+    by (metis empty_iff incidz.rep_eq inner_commute insert_iff)+
+  from proj2_rep_independent and \<open>p \<noteq> q\<close> have "independent ?A" by simp
+  from homog_non_zero have "?m' \<noteq> 0" by simp
+  with orthogonal_independent \<open>independent ?A\<close> ortho
+  have "independent ?B" by auto
+
+  from \<open>p \<noteq> q\<close> have "?p' \<noteq> ?q'"
+    by (metis Quotient3_abs_rep Quotient3_homogz homogz_of_homog_inject)
+  hence "card ?A = 2" by simp
+  moreover have "?m' \<notin> ?A"
+    using ortho(1) orthogonal_self homog_non_zero by auto
+  ultimately have "card ?B = 3" by simp
+  with independent_is_basis [of ?B] and \<open>independent ?B\<close>
+  have "is_basis ?B" by simp
+  with basis_expand obtain c where "?l' = (\<Sum> v\<in>?B. c v *\<^sub>R v)" by auto
+  let ?l'' = "?l' - c ?m' *\<^sub>R ?m'"
+  from \<open>?l' = (\<Sum> v\<in>?B. c v *\<^sub>R v)\<close> and \<open>?m' \<notin> ?A\<close>
+  have "?l'' = (\<Sum> v\<in>?A. c v *\<^sub>R v)" by simp
+  with orthogonal_sum [of ?A] ortho
+  have "orthogonal ?l' ?l''" and "orthogonal ?m' ?l''"
+    by (simp_all add: scalar_equiv)
+  from \<open>orthogonal ?m' ?l''\<close>
+  have "orthogonal (c ?m' *\<^sub>R ?m') ?l''" by (simp add: orthogonal_clauses)
+  with \<open>orthogonal ?l' ?l''\<close>
+  have "orthogonal ?l'' ?l''" by (simp add: orthogonal_clauses)
+  with orthogonal_self_eq_0 [of ?l''] have "?l'' = 0" by simp
+  with proj2_rep_dependent [of 1 l "- c ?m'" ?m] show "l = ?m" by simp
+qed
+
+lemma incid_unique:
+  assumes "incid p l"
+  and "incid q l"
+  and "incid p m"
+  and "incid q m"
+  shows "p = q \<or> l = m"
+proof cases
+  assume "p = q"
+  thus "p = q \<or> l = m" ..
+next
+  assume "p \<noteq> q"
+  with \<open>incid p l\<close> and \<open>incid q l\<close>
+    and line_through_unique
+  have "l = line_through p q" by simp
+  moreover from \<open>p \<noteq> q\<close> and \<open>incid p m\<close> and \<open>incid q m\<close>
+  have "m = line_through p q" by (rule line_through_unique)
+  ultimately show "p = q \<or> l = m" by simp
+qed
+
+lemma proj2_lines_define_point: "\<exists> p. incid p l \<and> incid p m"
+proof -
+  let ?l' = "l"
+  let ?m' = "m"
+  from proj2_points_define_line [of ?l' ?m']
+  obtain p' where "incid ?l' p' \<and> incid ?m' p'" by auto
+  hence "incid p' l \<and> incid p' m"
+    unfolding incid_def
+    by (simp add: incidz.rep_eq inner_commute)
+  thus "\<exists> p. incid p l \<and> incid p m" by auto
+qed
+
+definition intersection :: "homog \<Rightarrow> homog \<Rightarrow> homog" where
+  "intersection \<equiv> line_through"
+
+declare intersection_def [simp]
+
+
+lemma intersection_incident:
+  shows "incid (intersection l m) l"
+  and "incid (intersection l m) m"
+  using line_through_incident(1) [of "l" "m"]
+    and line_through_incident(2) [of "m" "l"]
+  unfolding intersection_def
+  by (simp_all add: incid_commute)
+
+lemma intersection_unique:
+  assumes "l \<noteq> m" and "incid p l" and "incid p m"
+  shows "p = intersection l m"
+proof -
+  from \<open>incid p l\<close> and \<open>incid p m\<close>
+    and incid_commute
+  have "incid l p" and "incid m p"
+    by simp_all
+  with \<open>l \<noteq> m\<close> and line_through_unique
+  have "p = line_through l m" by simp
+  thus "p = intersection l m"
+    unfolding intersection_def
+    by (simp)
+qed
+
+lemma proj2_not_self_incident:
+  "\<not> (incid p p)"
+  unfolding incid_def
+  using homog_non_zero and inner_eq_zero_iff [of "vec_of_homog p"]
+  by (simp add: incidz.rep_eq)
+
+lemma proj2_another_point_on_line:
+  "\<exists> q. q \<noteq> p \<and> incid q l"
+proof -
+  let ?m = "p"
+  let ?q = "intersection l ?m"
+  from intersection_incident
+  have "incid ?q l" and "incid ?q ?m" by simp_all
+  from \<open>incid ?q ?m\<close> and proj2_not_self_incident have "?q \<noteq> p" by auto
+  with \<open>incid ?q l\<close> show "\<exists> q. q \<noteq> p \<and> incid q l" by auto
+qed
+
+lemma proj2_another_line_through_point:
+  "\<exists> m. m \<noteq> l \<and> incid p m"
+proof -
+  from proj2_another_point_on_line
+  obtain q where "q \<noteq> l \<and> incid q p" by auto
+  with incid_commute
+  have "q \<noteq> l \<and> incid p q" by auto
+  thus "\<exists> m. m \<noteq> l \<and> incid p m" ..
+qed
+
+lemma incid_abs:
+  assumes "v \<noteq> 0" and "w \<noteq> 0"
+  shows "incid (homog_of_vec v) (homog_of_vec w) \<longleftrightarrow> v \<bullet> w = 0"
+  by (metis assms(1) assms(2) homogz_homog_eq incid_def incidz.abs_eq inner_eq_zero_iff zero_homogz_def)
+
+lemma incid_left_abs:
+  assumes "v \<noteq> 0"
+  shows "incid (homog_of_vec v) l \<longleftrightarrow> v \<bullet> (vec_of_homog l) = 0"
+proof -
+  have "vec_of_homog l \<noteq> 0"
+    by (simp add: homog_non_zero)
+  with \<open>v \<noteq> 0\<close> and incid_abs [of v "vec_of_homog l"]
+  show "incid (homog_of_vec v) l \<longleftrightarrow> v \<bullet> (vec_of_homog l) = 0"
+    by (metis Quotient3_abs_rep Quotient3_homogz homogz_of_homog_inverse)
+qed
+
+lemma incid_right_abs:
+  assumes "v \<noteq> 0"
+  shows "incid p (homog_of_vec v) \<longleftrightarrow> (vec_of_homog p) \<bullet> v = 0"
+proof -
+  have "vec_of_homog p \<noteq> 0" by (simp add: homog_non_zero)
+  with \<open>v \<noteq> 0\<close> and incid_abs [of "vec_of_homog p" v]
+  show "incid p (homog_of_vec v) \<longleftrightarrow> (vec_of_homog p) \<bullet> v = 0"
+    by (metis Quotient3_abs_rep Quotient3_homogz homogz_of_homog_inverse)
+qed
+
+lemma "p \<noteq> q \<Longrightarrow> join p q = line_through p q"
+  by (simp add: incid_joinz line_through_unique)
+
 
 end

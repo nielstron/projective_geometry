@@ -69,11 +69,11 @@ proof -
     then have "0 \<noteq> homogz_of_vec 1"
       by (metis incidz.abs_eq inner_eq_zero_iff rel_simps(93))
     then have "incidz 0 0 \<longrightarrow> (\<exists>n. incid P n) \<or> (\<exists>n. P \<noteq> n) \<or> (\<exists>h. homogz_of_homog P \<noteq> h \<and> 0 \<noteq> h)"
-      using f2 by (metis (full_types) incidz_meet(1) joinz.abs_eq) }
+      using f2 by (metis (full_types) incidz_meetz(1) joinz.abs_eq) }
   then show "\<exists>l. incid P l"
-    using f1 by (metis homogz_homog_eq incid_def incid_joinz(2))
+    using f1 by (metis (full_types) homogz_homog_eq incid_def incid_joinz(2))
   then show "\<exists>P. incid P l"
-    by (metis incid_joinz(3))
+    by (metis (full_types) incid_joinz(1) incid_commute)
 qed
 
 lemma ex4_indep_homogz: "\<exists>A B C D.
@@ -97,10 +97,10 @@ lemma ex4_indep_homogz: "\<exists>A B C D.
       "vector [0,0,1] :: (real, 3) vec"
       "vector [1,1,1] :: (real, 3) vec")
             apply (auto simp add: scalar_multiple_def)
-                      apply (metis rel_simps(93) vector_3 zero_index)
-                      apply (metis rel_simps(93) vector_3 zero_index)
-                     apply (metis rel_simps(93) vector_3 zero_index)
-                    apply (metis rel_simps(93) vector_3 zero_index)
+                      apply (metis zero_neq_one vector_3 zero_index)
+                      apply (metis zero_neq_one vector_3 zero_index)
+                     apply (metis zero_neq_one vector_3 zero_index)
+                    apply (metis zero_neq_one vector_3 zero_index)
                    apply (smt (z3) vector_3 vector_scaleR_component)
                   apply (smt (z3) vector_3 vector_scaleR_component)
                  apply (smt (z3) vector_3 vector_scaleR_component)
@@ -134,19 +134,14 @@ next
       by (simp add: ex_incid)
   next
     case False
-    then have "incid (nzmeet l m) l" "incid (nzmeet l m) m"
-      by (simp_all add: incid_joinz)
+    then have "incid (meet l m) l" "incid (meet l m) m"
+      by (simp_all add: incid_joinz incid_commute)
     then show ?thesis by blast
   qed
 next
   case (3 P l Q m)
   then show ?case
-    apply (transfer)
-    apply(auto simp add: scalar_multiple_def)
-    sorry (* TODO ! *)
-    find_theorems inner 0
-    find_theorems orthogonal
-    find_theorems collinear
+    by (simp add: incid_unique)
 next
   case 4
   then show ?case
